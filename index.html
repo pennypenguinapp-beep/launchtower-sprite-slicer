@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprite Sheet Slicer — LaunchTower</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --danger: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h2 { font-size: .95rem; margin-bottom: 12px; color: var(--accent); }
+  .drop {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    margin-bottom: 14px;
+    font-size: .9rem;
+  }
+  .drop.over { border-color: var(--accent); background: rgba(88,166,255,.08); }
+  .drop b { color: var(--text); }
+  input[type=file] { display: none; }
+  label.row { display: block; margin-bottom: 10px; }
+  label.row span { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+  input[type=number] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: .95rem;
+  }
+  input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .presets { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .presets button {
+    flex: 1;
+    min-width: 48px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 0;
+    cursor: pointer;
+    font-size: .85rem;
+  }
+  .presets button:hover { border-color: var(--accent); }
+  .presets button.active { border-color: var(--accent); background: rgba(88,166,255,.12); }
+  .stat { font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+  .stat b { color: var(--text); }
+  .btns { display: flex; flex-direction: column; gap: 8px; }
+  .btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #0d1117;
+    font-weight: 600;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: .9rem;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.alt { background: var(--accent2); }
+  .btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .preview-panel { display: flex; flex-direction: column; }
+  .preview-scroll {
+    overflow: auto;
+    max-height: 60vh;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #000;
+    position: relative;
+  }
+  .preview-scroll canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  .placeholder {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .tile-view {
+    margin-top: 14px;
+    display: none;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .tile-view.show { display: flex; }
+  .tile-view canvas {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: repeating-conic-gradient(#222 0 25%, #111 0 50%) 0 0 / 16px 16px;
+    image-rendering: pixelated;
+  }
+  .tile-meta { font-size: .85rem; color: var(--muted); }
+  .tile-meta b { color: var(--text); }
+  .tile-dl {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #0d1117;
+    font-weight: 600;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .footer { margin-top: 16px; text-align: center; color: var(--muted); font-size: .75rem; }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sprite Sheet <span>Slicer</span></h1>
+  <div class="sub">Slice any sprite sheet into individual tiles. 100% in-browser — your image never leaves your device.</div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>1 · Load sheet</h2>
+      <div class="drop" id="drop">
+        <b>Drop a sprite sheet here</b><br>or click to browse<br><small>PNG · JPG · GIF · WebP</small>
+      </div>
+      <input type="file" id="file" accept="image/*">
+
+      <h2>2 · Grid settings</h2>
+      <div class="presets" id="presets">
+        <button data-size="8">8px</button>
+        <button data-size="16" class="active">16px</button>
+        <button data-size="32">32px</button>
+        <button data-size="64">64px</button>
+      </div>
+      <label class="row"><span>Tile width (px)</span><input type="number" id="tw" min="1" value="16"></label>
+      <label class="row"><span>Tile height (px)</span><input type="number" id="th" min="1" value="16"></label>
+      <label class="row"><span>Outer margin (px)</span><input type="number" id="mg" min="0" value="0"></label>
+      <label class="row"><span>Spacing between tiles (px)</span><input type="number" id="sp" min="0" value="0"></label>
+
+      <div class="stat" id="stat">No image loaded</div>
+
+      <div class="btns">
+        <button class="btn" id="dlAll" disabled>⬇ Download all tiles</button>
+        <button class="btn alt" id="dlJson" disabled>⬇ Export JSON atlas</button>
+      </div>
+    </div>
+
+    <div class="panel preview-panel">
+      <h2>3 · Preview (click a tile to isolate it)</h2>
+      <div class="preview-scroll" id="pwrap">
+        <div class="placeholder" id="ph">Load a sprite sheet to see the slicing grid.</div>
+        <canvas id="cv" style="display:none"></canvas>
+      </div>
+      <div class="tile-view" id="tv">
+        <canvas id="tcv" width="128" height="128"></canvas>
+        <div class="tile-meta" id="tmeta"></div>
+        <button class="tile-dl" id="tdl">Download this tile</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Built by <a href="https://launchtower.dev" target="_blank" rel="noopener">LaunchTower</a> · free &amp; open, no tracking</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var fileIn = document.getElementById("file");
+  var drop = document.getElementById("drop");
+  var twIn = document.getElementById("tw"), thIn = document.getElementById("th");
+  var mgIn = document.getElementById("mg"), spIn = document.getElementById("sp");
+  var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  var ph = document.getElementById("ph"), pwrap = document.getElementById("pwrap");
+  var stat = document.getElementById("stat");
+  var dlAll = document.getElementById("dlAll"), dlJson = document.getElementById("dlJson");
+  var tv = document.getElementById("tv"), tcv = document.getElementById("tcv");
+  var tctx = tcv.getContext("2d"), tmeta = document.getElementById("tmeta"), tdl = document.getElementById("tdl");
+  var presets = document.getElementById("presets");
+
+  var img = null, tiles = [], zoom = 8, selected = -1;
+
+  // ---- file loading ----
+  function loadFile(f) {
+    if (!f || !f.type || f.type.indexOf("image/") !== 0) return;
+    var url = URL.createObjectURL(f);
+    var im = new Image();
+    im.onload = function () {
+      img = im;
+      URL.revokeObjectURL(url);
+      compute();
+    };
+    im.src = url;
+  }
+  fileIn.addEventListener("change", function () { loadFile(fileIn.files[0]); });
+  drop.addEventListener("click", function () { fileIn.click(); });
+  ["dragover", "dragenter"].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (ev) {
+    if (ev.dataTransfer && ev.dataTransfer.files.length) loadFile(ev.dataTransfer.files[0]);
+  });
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("drop", function (e) { e.preventDefault(); });
+
+  // ---- settings ----
+  presets.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var s = parseInt(b.dataset.size, 10);
+    twIn.value = s; thIn.value = s;
+    presets.querySelectorAll("button").forEach(function (x) { x.classList.remove("active"); });
+    b.classList.add("active");
+    compute();
+  });
+  [twIn, thIn, mgIn, spIn].forEach(function (el) {
+    el.addEventListener("input", function () {
+      presets.querySelectorAll("button").forEach(function (x) { x.classList.remove("active"); });
+      compute();
+    });
+  });
+
+  // ---- core: compute tile list + draw ----
+  function compute() {
+    if (!img) return;
+    var W = img.naturalWidth, H = img.naturalHeight;
+    var tw = Math.max(1, parseInt(twIn.value, 10) || 16);
+    var th = Math.max(1, parseInt(thIn.value, 10) || 16);
+    var mg = Math.max(0, parseInt(mgIn.value, 10) || 0);
+    var sp = Math.max(0, parseInt(spIn.value, 10) || 0);
+    var stepX = tw + sp, stepY = th + sp;
+    var cols = Math.floor((W - 2 * mg + sp) / stepX);
+    var rows = Math.floor((H - 2 * mg + sp) / stepY);
+    if (cols < 1 || rows < 1) {
+      stat.innerHTML = "Grid doesn't fit the image (need at least one tile).";
+      tiles = [];
+      drawGrid();
+      return;
+    }
+    tiles = [];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        tiles.push({
+          index: r * cols + c,
+          x: mg + c * stepX,
+          y: mg + r * stepY,
+          w: tw, h: th,
+          col: c, row: r
+        });
+      }
+    }
+    stat.innerHTML = "Image <b>" + W + "×" + H + "</b> · grid <b>" + cols + "×" + rows + "</b> · <b>" + tiles.length + "</b> tiles";
+    dlAll.disabled = false;
+    dlJson.disabled = false;
+    selected = -1;
+    tv.classList.remove("show");
+    drawGrid();
+  }
+
+  function drawGrid() {
+    if (!img) return;
+    var W = img.naturalWidth, H = img.naturalHeight;
+    // pick zoom so the sheet fits ~900px wide on desktop, min 4x
+    zoom = Math.max(4, Math.min(16, Math.floor(900 / W)));
+    cv.width = W * zoom;
+    cv.height = H * zoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, W, H);
+    // grid lines
+    ctx.strokeStyle = "rgba(88,166,255,0.9)";
+    ctx.lineWidth = 1;
+    var mg = Math.max(0, parseInt(mgIn.value, 10) || 0);
+    var sp = Math.max(0, parseInt(spIn.value, 10) || 0);
+    var tw = Math.max(1, parseInt(twIn.value, 10) || 16);
+    var th = Math.max(1, parseInt(thIn.value, 10) || 16);
+    var stepX = tw + sp, stepY = th + sp;
+    var cols = Math.floor((W - 2 * mg + sp) / stepX);
+    var rows = Math.floor((H - 2 * mg + sp) / stepY);
+    for (var c = 0; c <= cols; c++) {
+      var x = (mg + c * stepX) * zoom;
+      ctx.beginPath(); ctx.moveTo(x, mg * zoom); ctx.lineTo(x, (mg + rows * stepY - sp) * zoom); ctx.stroke();
+    }
+    for (var r = 0; r <= rows; r++) {
+      var y = (mg + r * stepY) * zoom;
+      ctx.beginPath(); ctx.moveTo(mg * zoom, y); ctx.lineTo((mg + cols * stepX - sp) * zoom, y); ctx.stroke();
+    }
+    // highlight selected
+    if (selected >= 0 && tiles[selected]) {
+      var t = tiles[selected];
+      ctx.fillStyle = "rgba(63,185,80,0.35)";
+      ctx.fillRect(t.x * zoom, t.y * zoom, t.w * zoom, t.h * zoom);
+      ctx.strokeStyle = "#3fb950";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(t.x * zoom, t.y * zoom, t.w * zoom, t.h * zoom);
+    }
+    cv.style.display = "block";
+    ph.style.display = "none";
+  }
+
+  // ---- click to select a tile ----
+  cv.addEventListener("click", function (e) {
+    if (!tiles.length) return;
+    var rect = cv.getBoundingClientRect();
+    var px = (e.clientX - rect.left) / zoom;
+    var py = (e.clientY - rect.top) / zoom;
+    var hit = -1;
+    for (var i = 0; i < tiles.length; i++) {
+      var t = tiles[i];
+      if (px >= t.x && px < t.x + t.w && py >= t.y && py < t.y + t.h) { hit = i; break; }
+    }
+    if (hit === -1) return;
+    selected = hit;
+    drawGrid();
+    showTile(tiles[hit]);
+  });
+
+  function showTile(t) {
+    var scale = Math.max(1, Math.floor(128 / Math.max(t.w, t.h)));
+    tcv.width = t.w * scale;
+    tcv.height = t.h * scale;
+    tctx.imageSmoothingEnabled = false;
+    tctx.clearRect(0, 0, tcv.width, tcv.height);
+    tctx.drawImage(img, t.x, t.y, t.w, t.h, 0, 0, t.w * scale, t.h * scale);
+    tmeta.innerHTML = "Tile <b>#" + t.index + "</b> · col " + t.col + ", row " + t.row + " · <b>" + t.w + "×" + t.h + "</b> px";
+    tv.classList.add("show");
+  }
+
+  // ---- downloads ----
+  function tileToBlob(t) {
+    var c = document.createElement("canvas");
+    c.width = t.w; c.height = t.h;
+    var x = c.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    x.drawImage(img, t.x, t.y, t.w, t.h, 0, 0, t.w, t.h);
+    return new Promise(function (res) { c.toBlob(res, "image/png"); });
+  }
+  function saveBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  tdl.addEventListener("click", function () {
+    if (selected < 0) return;
+    tileToBlob(tiles[selected]).then(function (b) { saveBlob(b, "tile_" + tiles[selected].index + ".png"); });
+  });
+  dlAll.addEventListener("click", function () {
+    if (!tiles.length) return;
+    dlAll.disabled = true;
+    (function next(i) {
+      if (i >= tiles.length) { dlAll.disabled = false; return; }
+      tileToBlob(tiles[i]).then(function (b) {
+        saveBlob(b, "tile_" + tiles[i].index + ".png");
+        setTimeout(function () { next(i + 1); }, 250);
+      });
+    })(0);
+  });
+  dlJson.addEventListener("click", function () {
+    if (!tiles.length) return;
+    var atlas = {
+      name: "sprite-atlas",
+      source: { width: img.naturalWidth, height: img.naturalHeight },
+      tile: { width: parseInt(twIn.value, 10), height: parseInt(thIn.value, 10) },
+      margin: parseInt(mgIn.value, 10),
+      spacing: parseInt(spIn.value, 10),
+      tiles: tiles.map(function (t) { return { index: t.index, x: t.x, y: t.y, w: t.w, h: t.h }; })
+    };
+    var blob = new Blob([JSON.stringify(atlas, null, 2)], { type: "application/json" });
+    saveBlob(blob, "sprite_atlas.json");
+  });
+})();
+</script>
+</body>
+</html>
