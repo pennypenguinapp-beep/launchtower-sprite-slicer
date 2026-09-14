@@ -292,7 +292,7 @@
     cv.width = W * zoom;
     cv.height = H * zoom;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, 0, 0, W, H);
+    ctx.drawImage(img, 0, 0, W * zoom, H * zoom);
     // grid lines
     ctx.strokeStyle = "rgba(88,166,255,0.9)";
     ctx.lineWidth = 1;
