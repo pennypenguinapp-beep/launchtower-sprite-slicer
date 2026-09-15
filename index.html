@@ -149,6 +149,7 @@
         <b>Drop a sprite sheet here</b><br>or click to browse<br><small>PNG · JPG · GIF · WebP</small>
       </div>
       <input type="file" id="file" accept="image/*">
+      <button class="btn" id="loadExample" style="margin-bottom:14px">✨ Load example sheet</button>
 
       <h2>2 · Grid settings</h2>
       <div class="presets" id="presets">
@@ -217,6 +218,32 @@
     im.src = url;
   }
   fileIn.addEventListener("change", function () { loadFile(fileIn.files[0]); });
+
+  // ---- built-in example sheet (no file needed) ----
+  function loadExample() {
+    var c = document.createElement("canvas");
+    c.width = 64; c.height = 32;
+    var x = c.getContext("2d");
+    var colors = ["#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6", "#ecf0f1"];
+    for (var r = 0; r < 2; r++) {
+      for (var col = 0; col < 4; col++) {
+        var ox = col * 16, oy = r * 16;
+        x.fillStyle = colors[(r * 4 + col) % colors.length];
+        x.fillRect(ox, oy, 16, 16);
+        x.fillStyle = "rgba(0,0,0,.35)";
+        if ((r + col) % 2 === 0) {
+          x.fillRect(ox + 4, oy + 4, 8, 8);
+        } else {
+          x.fillRect(ox + 2, oy + 10, 12, 4);
+          x.fillRect(ox + 6, oy + 2, 4, 8);
+        }
+      }
+    }
+    c.toBlob(function (b) {
+      if (b) loadFile(new File([b], "example-sheet.png", { type: "image/png" }));
+    }, "image/png");
+  }
+  document.getElementById("loadExample").addEventListener("click", loadExample);
   drop.addEventListener("click", function () { fileIn.click(); });
   ["dragover", "dragenter"].forEach(function (e) {
     drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add("over"); });
